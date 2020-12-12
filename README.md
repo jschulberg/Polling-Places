@@ -1,32 +1,51 @@
-# U.S.-Police-Fatalities
-This repository includes a thorough analysis of U.S. Police Fatalities. I will use a variety of exploratory and modeling techniques to answer the following questions:  
+## U.S. Polling Places (2012-2018)
 
-- How many people have been killed by police over time?
-- What is the race/age/gender of these people?
-- What are the demographics of the offending police officers?
-- What are the demographics of the general population in which the incident   occurred? This includes the political affiliations of the mayor, city council, and the presidential candidate that the city voted for in 2016.
-  
-The repository is organized as follows:  
+Learn more about this data here: [National data release sheds light on past polling place changes.](https://publicintegrity.org/politics/elections/ballotboxbarriers/data-release-sheds-light-on-past-polling-place-changes)
 
-| Folder | Description |
-| --- | --- |
-| Code | This section includes all of the R code used on the U.S. Police-caused Fatalities dataset. |
-| Data | This section includes the main datasets used throughout the analyses. |
+This data release contains standardized data on polling locations that were used in each election cycle since 2012 for all the states covered by the dataset. The initial release contains 30 states, with more to be added in the coming weeks.
 
+### Status
 
-### Note about the Data  
-In this analysis, I'll be working with a few datasets. Different datasets include different ranges of time for police fatalities, with some overlap. On top of that, I have some census, incident, and subject data. The data runs from **2000-2020**, which makes it an extremely expansive dataset of police-caused fatalities/killings over the *past 20 years*.  
+The initial release (2020-09-29) of this data contains data for the following states:
 
-### Addditional Resources  
-The original blog post can be found here:  
-**https://datacracy.netlify.app/post/u-s-police-caused-fatalities/**  
+*Alaska, Arizona, Arkansas, Connecticut, Delaware, Illinois, Indiana, Iowa, Kentucky, Louisiana, Maine, Maryland, Massachusetts, Mississippi, Montana, Nebraska, New Jersey, North Carolina, North Dakota, Ohio, Oklahoma, Pennsylvania, Rhode Island, South Carolina, South Dakota, Vermont, Virginia, West Virginia and Wisconsin.*
 
-Interested in seeing my original code? Go to my GitHub repository here:  
-**https://github.com/jschulberg/U.S.-Police-Fatalities**  
+This release also includes data for the following states but they are missing one or more election cycles:
 
-Interested in learning more on the subject? Go to:  
-**https://mappingpoliceviolence.org/**  
+*Georgia, Michigan, Minnesota, New Hampshire, New Mexico*
 
-Interested in seeing the Washington Post's GitHub repository and source data? Go to:  
-**https://github.com/washingtonpost/data-police-shootings**   
+Detailed information about current and future coverage in each state is available on the [Status page](STATUS.md).
 
+### Provenance
+
+This data was primarily acquired through public records requests to state or county election officials. In some cases, when state election officials no longer had the data, they authorized the Voting Information Project to release any data that was available in their archives. The source of each election year’s data is mentioned in the state’s README file. Additionally, the state README file contains any additional caveats about the data that you need to be aware of.
+
+This data set is only as good as the information that is provided by state and local officials. Often times polling places can be moved under "emergency changes" which might not be reflected in this dataset.
+
+We have made our best effort to ensure that the standardized data reflects the source documents as closely as possible. However, if you find any errors or any missing data, please open an Issue or reach out to Pratheek Rebala at <prebala@publicintegrity.org>.
+
+### Acknowledgements
+
+This data release is the result of a year-long effort and would not be possible without work of nearly a dozen staff members from the Center for Public Integrity & Stateline. If you find this data useful, we request that you please consider making a [tax-deductible contribution to Public Integrity here](https://checkout.fundjournalism.org/memberform?org_id=cpi&campaign=701f4000000FOWIAA4).
+
+The following reporters were instrumental in preparing this dataset.
+
+**The Center for Public Integrity**:
+- Carrie Levine
+- Pratheek Rebala
+- Kristian Hernández
+- Rui Kaneya
+- Alex Ellerbeck
+- Taylor Johnston
+- Kimberly Cataudella
+- Chris Zubak-Skees
+- Joe Yerardi
+- Joe Wertz
+
+**Stateline**:
+- Matt Vasilogambros
+- Tim Henderson
+
+### License & Attribution
+
+This data is being released under a CC BY 4.0 license. You are free to copy, redistribute and adapt this data. All that we ask is that you provide appropriate credit and a link to this license. You can [view the full LICENSE here](LICENSE).
