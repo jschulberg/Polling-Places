@@ -13,8 +13,11 @@ pacman::p_load(tidyverse,
 # The Data folder has 32 states represented in it, so we'll need to read
 # each one in
 
-# Determine the state name
-states <- list.files(here("Data/"))
+# Determine the different state folders in our dataset and remove any
+# already existing csv files
+all_files <- list.files(here("Data/"))
+csv_files <- list.files(here("Data/"), pattern = ".csv$")
+states <- setdiff(all_files, csv_files)
 
 # Initialize an empty dataframe
 polling_places <- data.frame(state_name = character(),
@@ -83,7 +86,7 @@ for (state_ in states) {
       polling_places <- bind_rows(polling_places, temp_df)
     }
   }
-  print("===========================\n===========================\n")
+  cat("===========================\n===========================\n")
 }
 
 # WE'RE DONE. THANK MOSES.
@@ -110,7 +113,7 @@ polling_cleaned <- polling_places %>%
     ward = as.numeric(ward)
   ) %>%
   # Remove notes since that only has one distinct value
-  select(-c(notes, ghost_precinct, state_name, polling_location_type)) %>%
+  select(-c(notes, ghost_precinct, state_name, polling_location_type, polling_place_id, ward)) %>%
   # State came in super weird, so let's replace this with state_abbreviation
   left_join(tibble(state = state.name, state_abb = state.abb), by = "state") %>%
   print()
