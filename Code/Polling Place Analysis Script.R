@@ -34,6 +34,7 @@ pacman::p_load("tidyverse", # Used for data wrangling,
                "janitor", # Used for data cleaning,
                "pdftools", # Used for reading PDF files in,
                "gganimate", # Used for interactive graphic visualizations,
+               "gridExtra", # Used for putting multiple plots next to each other
                "mapproj", # Used for visualizing maps
                "transformr", # Used to animate maps
                "gifski", # Used to create animated gifs
@@ -158,7 +159,7 @@ ggsave(here("Viz/Top Polling Places Bar Chart.jpg"), pp_bar)
 
 # Let's take a look at the same data on a map to look for differences
 # geographically.
-plot_usmap(data = pp_counts,
+pp_map <- plot_usmap(data = pp_counts,
            values = "ps_per_capita",
            color = "gray",
            # Only include states in our dataset
@@ -169,10 +170,10 @@ plot_usmap(data = pp_counts,
                         high = "slateblue",
                         # Manually set the limits so its easier to see differences
                         limits = c(0, 1500)) +
-  facet_wrap(~ year) +
-  labs(title = "Number of Polling Places by Population",
-       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
-                        "represents the number of polling places per 1,000,000 people."),
+  facet_wrap(~ year, nrow = 1) +
+  labs(# title = "Number of Polling Places by Population",
+       # subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
+       #                  "represents the number of polling places per 1,000,000 people."),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
   ) +
@@ -182,3 +183,39 @@ plot_usmap(data = pp_counts,
         plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
+
+pp_bar_one_row <- top_10_pp %>%
+  # Start our visualization, creating our groups by party affiliation
+  ggplot(aes(x = ps_per_capita,
+             # Reorder the variable so they are arrange descending for each year plot
+             y = forcats::fct_reorder(paste(state, year, sep = "_"), ps_per_capita)
+  )) +
+  geom_bar(stat = "identity", fill = "slateblue", na.rm = T) +
+  # Create a separate chart, with a flexible y-axis, for each level of office
+  facet_wrap(~year, scales = "free_y", nrow = 1) +
+  # Add a label by recreating our data build from earlier
+  geom_label(aes(label = paste(state_abb, ps_per_capita, sep = "-")),
+             size = 3,
+             # Scooch the labels over a smidge
+             hjust = .25) +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Polling Sites per Capita*") +
+  ylab("States") +
+  labs(title = "Number of Polling Places by Population",
+       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
+                        "represents the number of polling places per 1,000,000 people.")
+  ) +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(hjust = 0, color = "slateblue2", size = 10),
+        plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+combined_pp_plot <- grid.arrange(pp_bar_one_row, pp_map)
+combined_pp_plot
+
+ggsave(here("Viz/Top Polling Places Bar and Map.jpg"), combined_pp_plot)
+
