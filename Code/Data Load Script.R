@@ -15,8 +15,8 @@ pacman::p_load(tidyverse,
 
 # Determine the different state folders in our dataset and remove any
 # already existing csv files
-all_files <- list.files(here("Data/"))
-csv_files <- list.files(here("Data/"), pattern = ".csv$")
+all_files <- list.files(here("Data/Polling-Places-Data/"))
+csv_files <- list.files(here("Data/Polling-Places-Data/"), pattern = ".csv$")
 states <- setdiff(all_files, csv_files)
 
 # Initialize an empty dataframe
@@ -42,7 +42,7 @@ for (state_ in states) {
   print(state_)
   # Within each data folder, there are multiple .csv files, one for each election
   # Let's pull out each of these files
-  state_contents <- list.files(paste(here("Data/"), state_, sep = "/"))
+  state_contents <- list.files(paste(here("Data/Polling-Places-Data/"), state_, sep = "/"))
   cat("About to parse through the following files in the", state_, "folder:\n",
       state_contents)
 
@@ -56,7 +56,7 @@ for (state_ in states) {
       csvs <- c(csvs, i)
 
       # Find the file path name for the csv
-      csv_name <- paste("Data", state_, i, sep = "/")
+      csv_name <- paste("Data", "Polling-Places-Data", state_, i, sep = "/")
       # print(paste("File is located here:", csv_name))
 
       # Let's read in the file as a temporary dataframe
@@ -76,7 +76,6 @@ for (state_ in states) {
       ))
 
       # We want the state name from earlier to be brought in as the column
-      # temp_df$state_name <- "NJ"
       temp_df <- temp_df %>%
         mutate(state_name = state_,
                year = as.integer(str_extract(i, "\\d+"))

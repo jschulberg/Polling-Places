@@ -46,6 +46,7 @@ pacman::p_load("tidyverse", # Used for data wrangling,
 # Our base dataset
 polling_places <- readr::read_csv(here::here("Data/all_states_cleaned.csv"))
 census_data <- readr::read_csv(here::here("Data/Census_Structured.csv"))
+elections_data <- readr::read_csv(here::here("Data/Elections Data.csv"))
 
 
 # Convert to a tibble, my preferred data structure
@@ -55,10 +56,14 @@ census_data <- readr::read_csv(here::here("Data/Census_Structured.csv"))
 ########################################################################
 ## Wrangle Data --------------------------------------------------------
 ########################################################################
-# Let's start by bringing our census data in
+# Let's start by bringing our census and state elections data in
 polling_joined <- polling_places %>%
   left_join(census_data, by = c("state", "year")) %>%
+  left_join(elections_data, by = c("state_code", "year")) %>%
   select(-state_code) %>%
+  # Create new columns based on the election data and filter out empty years
+  mutate(total_vote = democratic_votes + republican_votes + other_votes) %>%
+  filter(!is.na(total_vote)) %>%
   print()
 
 
