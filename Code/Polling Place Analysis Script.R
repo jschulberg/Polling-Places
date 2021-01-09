@@ -224,3 +224,116 @@ combined_pp_plot
 
 ggsave(here("Viz/Top Polling Places Bar and Map.jpg"), combined_pp_plot)
 
+
+########################################################################
+## Elections Correlation -----------------------------------------------
+########################################################################
+# In this next section, I'd like to leverage elections data to look for trends
+# in the number of polling places. The elections data has been pulled from
+# [FEC.gov](https://www.fec.gov/introduction-campaign-finance/election-and-voting-information/)
+# In the data, I look at the breakdown, by party, of the House, Senate, and Presidential
+# races and the total number of votes for each in every general election between
+# 2012 and 2018, to match the polling places data.
+
+# Let's start by getting the dataset into a state-wide form.
+state_results <- polling_joined %>%
+  group_by(state, state_abb, year, population, election, democratic_votes,
+           republican_votes, other_votes, total_vote) %>%
+  summarise(polling_sites = n(),
+            # Determine which party won each election
+            party_winner = case_when(
+              democratic_votes > republican_votes && democratic_votes > other_votes ~ "Democrat",
+              republican_votes > democratic_votes && republican_votes > other_votes ~ "Republican",
+              other_votes > republican_votes && other_votes > democratic_votes ~ "Third Party",
+              TRUE ~ "ERROR!!!!"
+            )) %>%
+  ungroup() %>%
+  mutate(
+    # Pull in our population data to calculate the per capita rate of polling places
+    ps_per_capita = round(1000000 * polling_sites / population, 0),
+    # Calculate the % share of each party
+    democratic_share = 100*round(democratic_votes / total_vote, 2),
+    republican_share = 100*round(republican_votes / total_vote, 2),
+    other_share = 100*round(other_votes / total_vote, 2)
+  ) %>%
+  arrange(state, year) %>%
+  print()
+
+
+# I'd also like to figure out who "owns" a state. That is, if Democrats won
+# House, Senate, and President, they "own" that state. However, if Democrats
+# only won House and Senate, but not President, the ownership is mixed
+party_triumphs <- state_results %>%
+  group_by(state, year) %>%
+  summarise(elections = n()) %>%
+  ungroup() %>%
+  left_join(state_results) %>%
+  group_by(state, year, elections, party_winner) %>%
+  summarise(party_triumphs = n()) %>%
+  ungroup() %>%
+  mutate(percent_control = party_triumphs / elections,
+         # If percent control is 1, the party swept the election. Otherwise,
+         # it's a mixed result
+         owner = case_when(
+           percent_control < 1 ~ "Split Ticket",
+           party_winner == "Republican" ~ "Republican-controlled",
+           party_winner == "Democrat" ~ "Democrat-controlled",
+           party_winner == "Third Party" ~ "Third Party-controlled",
+           TRUE ~ "ERROR!!! ABORT!!!!!"
+         )) %>%
+  arrange(state, year) %>%
+  print()
+
+# Bring this data back into state_results
+state_winners <- state_results %>%
+  left_join(party_triumphs, by = c("state", "year")) %>%
+  select(-"party_winner.y") %>%
+  rename("party_winner" = "party_winner.x") %>%
+  print()
+
+
+# Create a dataframe of party colors that we can use for our visualizations
+party_colors <- tibble(
+  party_colors = c("#2E74C0", "#CB454A", "#999999"),
+  owner = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
+)
+
+# Now that we have our dataset, let's build 4 scatter plots (one for each year)
+# of polling places by number of total votes
+votes_scatter <- state_winners %>%
+  group_by(state, state_abb, year,  owner, polling_sites, population) %>%
+  # There's a lot of issues with me doing this, but I'll keep it for now
+  summarise(cumulative_vote = sum(total_vote)) %>%
+  ggplot(aes(x = polling_sites, y = cumulative_vote, color = owner)) +
+  geom_point(alpha = .8, size = 2) +
+  geom_text(aes(label = state, # label by state
+            color = owner), # Make our color match
+            size = 3.5, # shrink the size
+            alpha = .9, # add some transparency
+            check_overlap = T, # avoid overlabelling
+            nudge_y = 1000000) + # nudge the text a bit off center
+  scale_color_manual(
+    name = "Party Winner of Federal Elections",
+    values = c("#2E74C0", "#CB454A", "#999999"),
+    labels = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
+    ) +
+  theme_classic() +
+  # Create separate scatter plots for each year
+  facet_wrap(~ year, scales = "free") +
+  # Add a regression line so we can see how the general trend compares
+  # geom_smooth(method = "lm", se = FALSE, alpha = .6, linetype = "dash") +
+  # Let's change the names of the axes and title
+  labs(title = "Number of Polling Places by Total Votes Cast",
+       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,"),
+       caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
+                       "https://github.com/publici/us-polling-places")
+  ) +
+  xlab("Number of Polling Sites") +
+  ylab("Total Votes Cast") +
+  # Center the title and format the subtitle/caption
+  theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(color = "slateblue1", size = 10),
+        plot.caption = element_text(hjust = 1, face = "italic", color = "dark gray"))
+votes_scatter
+
+ggsave(here("Viz/Polling Places by Votes Scatter Plot.jpg"), votes_scatter)
