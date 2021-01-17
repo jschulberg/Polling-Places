@@ -22,6 +22,7 @@ suppressMessages(library("pacman"))
 pacman::p_load("tidyverse", # Used for data wrangling,
                "tidyr", # Used for data cleaning,
                "ggplot2", # Used for visualizations,
+               "ggrepel", # Used for labeling points in a ggplot viz
                "here", # Used for navigating project structure
                "maps", # Used for map-based visualizations
                "readxl", # Used for loading excel files,
@@ -174,7 +175,7 @@ pp_map <- plot_usmap(data = pp_counts,
                         low = "white",
                         high = "slateblue",
                         # Manually set the limits so its easier to see differences
-                        limits = c(0, 1500)) +
+                        limits = c(0, 3750)) +
   facet_wrap(~ year, nrow = 1) +
   labs(# title = "Number of Polling Places by Population",
        # subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
@@ -285,18 +286,46 @@ party_triumphs <- state_results %>%
   print()
 
 # Bring this data back into state_results
-state_winners <- state_results %>%
-  left_join(party_triumphs, by = c("state", "year")) %>%
-  select(-"party_winner.y") %>%
-  rename("party_winner" = "party_winner.x") %>%
+state_winners <- party_triumphs %>%
+  select(state, year, elections, owner) %>%
+  right_join(state_results, by = c("state", "year")) %>%
+  distinct() %>%
   print()
-
 
 # Create a dataframe of party colors that we can use for our visualizations
 party_colors <- tibble(
   party_colors = c("#2E74C0", "#CB454A", "#999999"),
   owner = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
 )
+
+# First, let's take a look at which party won each state over the past four
+# election cycles: Democrats, Republicans, Third Party, or Split Ticket (i.e.
+# Dems won the House and Republicans the Senate + Presidency)
+election_map <- plot_usmap(data = state_winners,
+                     values = "state_abb",
+                     color = "owner",
+                     # Only include states in our dataset
+                     include = unique(state_winners$state_abb)) +
+  scale_fill_manual(
+    name = "Party Winner of Federal Elections",
+    values = c("#2E74C0", "#CB454A", "#999999"),
+    labels = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
+  ) +
+  facet_wrap(~ year) +
+  labs(# title = "Number of Polling Places by Population",
+    # subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
+    #                  "represents the number of polling places per 1,000,000 people."),
+    caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
+                    "https://github.com/publici/us-polling-places")
+  ) +
+  theme(legend.position = "right",
+        plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(hjust = 0, color = "slateblue2", size = 10),
+        plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+election_map
+
 
 # Now that we have our dataset, let's build 4 scatter plots (one for each year)
 # of polling places by number of total votes
@@ -306,12 +335,7 @@ votes_scatter <- state_winners %>%
   summarise(cumulative_vote = sum(total_vote)) %>%
   ggplot(aes(x = polling_sites, y = cumulative_vote, color = owner)) +
   geom_point(alpha = .8, size = 2) +
-  geom_text(aes(label = state, # label by state
-            color = owner), # Make our color match
-            size = 3.5, # shrink the size
-            alpha = .9, # add some transparency
-            check_overlap = T, # avoid overlabelling
-            nudge_y = 1000000) + # nudge the text a bit off center
+  geom_text_repel(aes(label = state)) +
   scale_color_manual(
     name = "Party Winner of Federal Elections",
     values = c("#2E74C0", "#CB454A", "#999999"),
@@ -337,3 +361,5 @@ votes_scatter <- state_winners %>%
 votes_scatter
 
 ggsave(here("Viz/Polling Places by Votes Scatter Plot.jpg"), votes_scatter)
+
+
