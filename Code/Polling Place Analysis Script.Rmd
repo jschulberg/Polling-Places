@@ -1,19 +1,33 @@
-###########################################################################
-###########################################################################
+---
+title: "Polling Places Analysis"
+author: "Justin S."
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+code_folding: TRUE
+---
 
-#######                    Polling Places Analysis                  #######
+In this article, I will analyze a dataset of U.S. polling places, compiled by the [Center for Public Integrity](https://publicintegrity.org/politics/elections/ballotboxbarriers/data-release-sheds-light-on-past-polling-place-changes). Thanks to the great work done by CPI, information on polling place locations and addresses is available for over 30 states for the 2012, 2014, 2016, and 2018 elections. Using a variety of exploratory and modeling techniques, I will analyze the data to answer the following questions:  
 
-###########################################################################
-###########################################################################
-# In this script, I will analyze the a dataset of U.S. polling places included
-# in the data folder of this repository. I will use a variety of exploratory
-# and modeling techniques to answer the following questions:
+- Which states provide the most polling places?  
+- How have the number of polling places trended over time?  
+- Is the number of polling places proportional to the population in each state?  
+- Do states that tend to go Republican have less polling places than do states that tend to go Democrat?  
 
-# Which states provide the most polling places?
-# How do these compare to population centers in each state?
-# How have the number of polling places trended over time?
+```{r fig.align='center', fig.height=6, fig.width=6, message=FALSE, warning=FALSE, include=FALSE}
+# Set our plot specifications for the rest of the document.
+knitr::opts_chunk$set(fig.width = 9,
+                      fig.height = 6,
+                      fig.align = "center",
+                      # Set our code specifications for the rest of the document
+                      echo = F,
+                      warning = F,
+                      message = F)
+```
 
-
+```{r set-up_and_clean_data, include=FALSE}
 ###########################################################################
 ## Set Up -----------------------------------------------------------------
 ###########################################################################
@@ -53,9 +67,13 @@ elections_data <- readr::read_csv(here::here("Data/Elections Data.csv"))
 
 
 # Convert to a tibble, my preferred data structure
-(polling_places <- as_tibble(polling_places))
+polling_places <- as_tibble(polling_places)
 
+```
 
+Let's start by taking a look at the data.
+
+```{r display_data}
 ########################################################################
 ## Wrangle Data --------------------------------------------------------
 ########################################################################
@@ -66,9 +84,32 @@ polling_joined <- polling_places %>%
   select(-state_code) %>%
   # Create new columns based on the election data and filter out empty years
   mutate(total_vote = democratic_votes + republican_votes + other_votes) %>%
-  filter(!is.na(total_vote)) %>%
-  print()
+  filter(!is.na(total_vote))
 
+# Let's view the data output
+# In any kable outputs, display NAs as blanks
+opts <- options(knitr.kable.NA = "")
+
+polling_joined %>% 
+  head(25) %>%
+  # Fix up the headers by replacing the underscores with spaces
+  rename_all(funs(str_replace_all(., "_", " "))) %>% 
+  # Make everything proper capitalization
+  rename_all(funs(str_to_title)) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = F,
+                font_size = 10) %>%
+  # Make the header row bold and black so it's easier to read
+  row_spec(0, bold = T, color = "black") %>% 
+  scroll_box(height = "400px", width = "100%")
+```
+
+In the dataset we can see quite a bit of information! Each row corresponds to a polling place available during a given election. So in 2012 at the *Agricultural Museum - Fairgrounds* polling place, there were two elections: one for House races and one for President, thus resulting in two rows of our dataset. For each polling place we can see a few things of interest, including the location of the site, the number of people who voted in that state election (NOT the number of people who voted at that site), the population of the state, and so on.  
+
+Using this data, let's try to understand trends in the number of polling places in each state. We'll start by looking at the relationship between the number of polling places and the population of each state.  
+  
+```{r top_10_states}
 
 ########################################################################
 ## Viz Time ------------------------------------------------------------
@@ -83,16 +124,15 @@ pp_counts <- polling_joined %>%
     percent_change = round(100*((polling_sites - lag(polling_sites)) / lag(polling_sites)), 2),
     # Pull in our population data to calculate the per capita rate of polling places
     ps_per_capita = round(1000000 * polling_sites / population, 0)
-    ) %>%
-  print()
+    ) 
 
 # Now that we have our dataset, let's build 4 scatter plots (one for each year)
 # and look for any outliers.
-pp_scatter <- pp_counts %>%
+pp_counts %>%
 ggplot(aes(x = polling_sites, y = population)) +
   # Make it a scatter plot
-  geom_point(color = "slateblue", alpha = .8, size = 2) +
-  geom_text_repel(aes(label = state)) +
+  geom_point(color = "slateblue", alpha = .7, size = 2) +
+  geom_text_repel(aes(label = state), max.overlaps = 3) +
   theme_classic() +
   # Create separate scatter plots for each year
   facet_wrap(~ year) +
@@ -108,9 +148,13 @@ ggplot(aes(x = polling_sites, y = population)) +
   theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
         plot.subtitle = element_text(color = "slateblue1", size = 10),
         plot.caption = element_text(hjust = 1, face = "italic", color = "dark gray"))
+```
 
-ggsave(here("Viz/Polling Places Scatter Plot.jpg"), pp_scatter)
+As population increases, the number of polling sites also increases. This trend holds steadily true for each election, regardless of whether there was a Presidential election (2012 + 2016) or just House/Senate elections (2014 + 2018).
 
+Let's get a better look at which states had proportionally more polling places than they did general population (the per capita rate).
+
+```{r map_and_bar}
 # Let's try two more visualizations to help look for patterns
 # Start by creating a dataframe of our top 10 states per year
 top_10_pp <- pp_counts %>%
@@ -120,8 +164,7 @@ top_10_pp <- pp_counts %>%
   top_n(10, ps_per_capita) %>%
   # Rearrange our dataset
   arrange(year, desc(ps_per_capita)) %>%
-  ungroup() %>%
-  print()
+  ungroup()
 
 
 pp_bar <- top_10_pp %>%
@@ -155,8 +198,6 @@ pp_bar <- top_10_pp %>%
         plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
-
-ggsave(here("Viz/Top Polling Places Bar Chart.jpg"), pp_bar)
 
 
 # Let's take a look at the same data on a map to look for differences
@@ -194,12 +235,10 @@ pp_bar_one_row <- top_10_pp %>%
   )) +
   geom_bar(stat = "identity", fill = "slateblue", na.rm = T) +
   # Create a separate chart, with a flexible y-axis, for each level of office
-  facet_wrap(~year, scales = "free_y", nrow = 1) +
+  facet_wrap(~year, nrow = 1) +
   # Add a label by recreating our data build from earlier
   geom_label(aes(label = paste(state_abb, ps_per_capita, sep = "-")),
-             size = 3,
-             # Scooch the labels over a smidge
-             hjust = .25) +
+             size = 2) +
   # Change the theme to classic
   theme_classic() +
   # Let's change the names of the axes and title
@@ -217,21 +256,20 @@ pp_bar_one_row <- top_10_pp %>%
         axis.ticks.y = element_blank())
 
 combined_pp_plot <- grid.arrange(pp_bar_one_row, pp_map)
-combined_pp_plot
 
-ggsave(here("Viz/Top Polling Places Bar and Map.jpg"), combined_pp_plot)
+```
+Above I've stacked a bar chart showing the top 10 states by polling sites per capita on top of a map-based visualization showing the same. Although there isn't much of a geographic differentiation in the number of polling sites per capita by state (it definitely hurts that CPI has only collected this data for 32 states), I do notice that the numbers **aren't skewed by Northeast vs. South**, which would have been my initial assumption. It's also clear that states commission more public polling sites during Presidential election years than off-cycle years.  
 
 
-########################################################################
-## Elections Correlation -----------------------------------------------
-########################################################################
-# In this next section, I'd like to leverage elections data to look for trends
-# in the number of polling places. The elections data has been pulled from
-# [FEC.gov](https://www.fec.gov/introduction-campaign-finance/election-and-voting-information/)
-# In the data, I look at the breakdown, by party, of the House, Senate, and Presidential
-# races and the total number of votes for each in every general election between
-# 2012 and 2018, to match the polling places data.
+## Elections Correlation  
+In this next section, I'd like to leverage elections data to look at the relationship between the number of polling places in a state and which party won elections in that state. The elections data have been pulled from [FEC.gov](https://www.fec.gov/introduction-campaign-finance/election-and-voting-information/). In the data, I look at the breakdown, by party, of the House, Senate, and Presidential races and the total number of votes for each in every general election between
+2012 and 2018, using that data to match onto the polling places data.  
 
+I'll do so by determining a new variable defined by the overall races won by a political party in a given state. For example, if in New Jersey 2018, Democrats won the House and Senate races, Democrats controlled that election year in NJ. If in Wisconsin, a Republican (Trump) won the Presidential election in 2016, but Democrats overall won the House races, then it's a "Split Ticket" state.  
+
+Let's start by getting a sense of this new variable. Which party won each state in the past 4 elections?  
+
+```{r elections}
 # Let's start by getting the dataset into a state-wide form.
 state_results <- polling_joined %>%
   group_by(state, state_abb, year, population, election, democratic_votes,
@@ -253,8 +291,7 @@ state_results <- polling_joined %>%
     republican_share = 100*round(republican_votes / total_vote, 2),
     other_share = 100*round(other_votes / total_vote, 2)
   ) %>%
-  arrange(state, year) %>%
-  print()
+  arrange(state, year) 
 
 
 # I'd also like to figure out who "owns" a state. That is, if Democrats won
@@ -278,15 +315,13 @@ party_triumphs <- state_results %>%
            party_winner == "Third Party" ~ "Third Party-controlled",
            TRUE ~ "ERROR!!! ABORT!!!!!"
          )) %>%
-  arrange(state, year) %>%
-  print()
+  arrange(state, year)
 
 # Bring this data back into state_results
 state_winners <- party_triumphs %>%
   select(state, year, elections, owner) %>%
   right_join(state_results, by = c("state", "year")) %>%
-  distinct() %>%
-  print()
+  distinct() 
 
 # Create a dataframe of party colors that we can use for our visualizations
 party_colors <- tibble(
@@ -298,10 +333,10 @@ party_colors <- tibble(
 # election cycles: Democrats, Republicans, Third Party, or Split Ticket (i.e.
 # Dems won the House and Republicans the Senate + Presidency)
 election_map <- plot_usmap(data = state_winners,
-                     values = "state_abb",
-                     # color = state_winners$owner,
-                     # Only include states in our dataset
-                     include = unique(state_winners$state_abb)) +
+                           regions = "state",
+                           values = "owner",
+                           # Only include states in our dataset
+                           include = unique(state_winners$state_abb)) +
   scale_fill_manual(
     name = "Party Winner of Federal Elections",
     values = c("#2E74C0", "#CB454A", "#999999"),
@@ -321,17 +356,18 @@ election_map <- plot_usmap(data = state_winners,
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 election_map
+```
 
+Now that we better understand how this variable works, let's correlate this against the number of polling sites available to voters in that state. Now that we have our dataset, we'll build 4 scatter plots (one for each year) of polling places by number of total votes.
 
-# Now that we have our dataset, let's build 4 scatter plots (one for each year)
-# of polling places by number of total votes
+```{r votes_scatter}
 votes_scatter <- state_winners %>%
   group_by(state, state_abb, year,  owner, polling_sites, population) %>%
   # There's a lot of issues with me doing this, but I'll keep it for now
   summarise(cumulative_vote = sum(total_vote)) %>%
   ggplot(aes(x = polling_sites, y = cumulative_vote, color = owner)) +
   geom_point(alpha = .8, size = 2) +
-  geom_text_repel(aes(label = state)) +
+  geom_text_repel(aes(label = state), max.overlaps = 3) +
   scale_color_manual(
     name = "Party Winner of Federal Elections",
     values = c("#2E74C0", "#CB454A", "#999999"),
@@ -340,8 +376,6 @@ votes_scatter <- state_winners %>%
   theme_classic() +
   # Create separate scatter plots for each year
   facet_wrap(~ year, scales = "free") +
-  # Add a regression line so we can see how the general trend compares
-  # geom_smooth(method = "lm", se = FALSE, alpha = .6, linetype = "dash") +
   # Let's change the names of the axes and title
   labs(title = "Number of Polling Places by Total Votes Cast",
        subtitle = paste("*Data is broken out across", n_distinct(pp_counts$state), "states"),
@@ -355,11 +389,11 @@ votes_scatter <- state_winners %>%
         plot.subtitle = element_text(color = "slateblue1", size = 10),
         plot.caption = element_text(hjust = 1, face = "italic", color = "dark gray"))
 votes_scatter
+```
 
-ggsave(here("Viz/Polling Places by Votes Scatter Plot.jpg"), votes_scatter)
+Let's take another look at our top 10 counts from earlier to see if there's a correlation with which party won a given state.
 
-# Let's take another look at our top 10 counts from earlier to see if there's a correlation with
-# which party won a given state
+```{r top_10_by_party}
 top_10_by_party <- party_triumphs %>%
   select(state, year, owner) %>%
   distinct() %>%
@@ -401,16 +435,13 @@ top_10_by_party <- party_triumphs %>%
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 top_10_by_party
+```
 
-ggsave(here("Viz/Top Polling Places by Party Winner.jpg"), top_10_by_party)
+Interestingly enough, in the most notable election covered by our dataset -- the 2016 election -- states that ended up going full Republican had the most polling places per capita. The state with the most polling places per capita in 2016 -- Wisconsin -- was notable in that it swung for Trump, much to the Hillary campaign's surprise.  
 
-# Interestingly enough, in the most notable election covered by our dataset -- the 2016 election --
-# states that ended up going full Republican had the most polling places per capita. The state with
-# the most polling places per capita in 2016 -- Wisconsin -- was notable in that it swung for Trump,
-# much to the Hillary campaign's surprise. To be honest, this finding surprises me a bit, especially
-# given a lot of the rhetoric that Republican states go out of their way to make it more difficult
-# for individuals to vote. Let's take a look at our "worst" 10 states to see if this trend holds.
+To be honest, this finding surprises me a bit, especially given a lot of the rhetoric that Republican states go out of their way to make it more difficult for individuals to vote. Let's take a look at our "worst" 10 states to see if this trend reverses.    
 
+```{r bottom_10}
 bottom_10_by_party <- pp_counts %>%
   # Group by level and state
   group_by(year) %>%
@@ -460,19 +491,16 @@ bottom_10_by_party <- pp_counts %>%
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 bottom_10_by_party
+```
 
-ggsave(here("Viz/Bottom Polling Places by Party Winner.jpg"), bottom_10_by_party)
+Looking at the bottom polling places makes the argument a bit more muddled. It's overall a healthier mix of states that went full-Democrat and full-Republican (along with a fair share that had mixed results).  
 
-# Looking at the bottom polling places makes the argument a bit more muddled. It's overall a healthier
-# mix of states that went full-Democrat and full-Republican (along with a fair share that had mixed
-# results).
-
-
-# Let's take a closer look at our House races. Specifically, let's tie together all three measures
-# we've previously been discussing:
-#   1. Number of Polling Sites
-#   2. Number of Votes Cast
-#   3. Total Popoulation
+Let's take a closer look at our **House** races. Specifically, let's tie together all three measures we've previously been discussing:  
+  1. Number of Polling Sites  
+  2. Number of Votes Cast  
+  3. Total Population  
+  
+```{r house_winners}
 state_winners %>%
   filter(election == "House") %>%
   ggplot(aes(x = polling_sites, y = total_vote, color = party_winner, size = population)) +
@@ -491,8 +519,7 @@ state_winners %>%
   facet_wrap(~ year) +
   # Let's change the names of the axes and title
   labs(title = "Number of Polling Places by Population",
-       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
-                        "represents the number of polling places per 1,000,000 people."),
+       subtitle = paste("Data is broken out across", n_distinct(pp_counts$state), "states".),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
   ) +
@@ -502,12 +529,13 @@ state_winners %>%
   theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
         plot.subtitle = element_text(color = "slateblue1", size = 10),
         plot.caption = element_text(hjust = 1, face = "italic", color = "dark gray"))
+```
 
-# In terms of trend, I can't see much distinction between states where Republicans won the House
-# versus Democrats. Let's test this using regression. In particular, let's fit a regression
-# model for House elections, using party, number of votes cast, and population as predictors.
-# We expect, based on the plot above, to see highly correlative relationships between number of votes
-# cast, population, and number of polling places. The real question lies in party.
+In terms of trend, I can't see much distinction between states where Republicans won the House versus Democrats. Let's test this formally using regression. In particular, let's fit a regression model for House elections, using party, number of votes cast, and population as predictors. We expect, based on the plot above, to see highly correlative relationships between number of votes cast, population, and number of polling places. The real question lies in party.  
+
+Here are the results from running a basic regression:  
+
+```{r house_regression}
 house_winners <- state_winners %>%
   filter(election == "House") %>%
   # Let's make it a bit easier to interpret our data
@@ -516,32 +544,18 @@ house_winners <- state_winners %>%
 
 polling_places_model <- lm(polling_sites ~ votes_per_million + pop_per_million + party_winner + year, data = house_winners)
 pander(summary(polling_places_model))
+```
 
-# Looking at the model summary, there are a few interesting things to point out about the relationship
-# between the number of polling sites in a given state.
-#   1. **Population.** The most important thing to note, is that there is only one feature that adequately predicts
-#     the number of polling sites: population. The model states that for every *additional* 577 people
-#     per million in a state, there will be 1 additional polling site.
-#   2. **Total Votes Cast.** Now, if you look back at the bubble plot above, you'd probably (like me) assume that the number
-#     of total votes cast is also a strong predictor for number of polling sites. Why then is the p-value
-#     (denoted in the model output as PR(>|t|) ) .6867 -- much higher than the usual .05 threshold used
-#     to determine statistical significance? Well, it's also true that the number of total votes cast
-#     is extremely highly correlated with the population of a state. States with larger populations naturally
-#     have many more people turn out to vote. Thus, having both of these features in as predictors is
-#     redundant.
-#   3. **Party.** The question we've all been waiting for. Is it true that the party that wins
-#     the House elections in a given state is determinate of the number of polling sites in that
-#     state? Turns out, not so much. The p-value for party winner (denoted *party_winnerRepublican*,
-#     representing the base case in which a state goes Republican) is .3694, well beyond the usual
-#     threshold of .05. Thus, we cannot reject our initial null hypothesis that party winner predicts
-#     number of polling sites.
+Looking at the model summary, there are a few interesting things to point out about trends in the number of polling sites in a given state.  
+
+   1. **Population |** The most important thing to note is that there is **only one factor that adequately predicts the number of polling sites: population**. The model states that for every *additional* 577 people per million in a state, there will be 1 additional polling site.  
+   2. **Total Votes Cast |** Now, if you look back at the bubble plot above, you'd probably (like me) assume that the number of total votes cast is also a strong predictor for number of polling sites. As one increases, so does the other. Why then is the p-value (*denoted in the model output as PR(>|t|)* ) .6867 -- much higher than the usual .05 threshold used to determine statistical significance? Well, it's also true that **the number of total votes cast is highly correlated with the population of a state**. States with larger populations naturally have more people turn out to vote. Thus, using both  features as predictors is redundant.  
+   3. **Party |** The question we've all been waiting for. Is it true that the party that wins the House elections in a given state is determinate of the number of polling sites in that state? Turns out, not so much. **The p-value for party winner** (denoted *party_winnerRepublican*, representing the base case in which a state goes Republican) **is .3694, well above the usual threshold of .05**. Thus, we cannot reject our initial null hypothesis that party winner predicts number of polling sites.
 
 
-## Future Analysis
-# This article really is just a small look at one facet of elections: polling places. Where else
-# should this article go? Well, if I could get my hands on elections data smaller at the county-level
-# or even more granular, I could run a lot of the previous analyses on a much more robust dataset.
-# Unfortunately, that data is expensive.
+## Future Analysis  
+This article really is just a small look at one facet of elections: polling places. Where else should this article go? Well, if I could get my hands on elections data smaller at the county-level or even more granular, I could run a lot of the previous analyses on a much more robust dataset. Unfortunately, that data is expensive.  
 
-# Where else should I go with this? Leave your thoughts in the comments.
-knitr::spin()
+Otherwise, a good route for this analysis would be to compare the availability of polling places with demographic data on a zip code or county level. The hypothesis here would be that white Americans have better (i.e. more) access to polling places.  
+
+Where else should I go with this? Leave your thoughts in the comments.
