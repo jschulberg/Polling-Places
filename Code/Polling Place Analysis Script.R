@@ -90,19 +90,13 @@ pp_scatter <- pp_counts %>%
 ggplot(aes(x = polling_sites, y = population)) +
   # Make it a scatter plot
   geom_point(color = "slateblue", alpha = .8, size = 2) +
-  geom_text(aes(label = state), # label by state
-            color = "slateblue", # Make our color match
-            size = 4, # shrink the size
-            alpha = .9, # add some transparency
-            check_overlap = T, # avoid overlabelling
-            nudge_y = 500000) + # nudge the text a bit off center
+  geom_text_repel(aes(label = state)) +
   theme_classic() +
   # Create separate scatter plots for each year
   facet_wrap(~ year) +
   # Let's change the names of the axes and title
   labs(title = "Number of Polling Places by Population",
-       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
-                        "represents the number of polling places per 1,000,000 people."),
+       subtitle = paste("*Data is broken out across", n_distinct(pp_counts$state), "states."),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
        ) +
@@ -148,7 +142,7 @@ pp_bar <- top_10_pp %>%
   xlab("Polling Sites per Capita*") +
   ylab("States") +
   labs(title = "Number of Polling Places by Population",
-       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
+       subtitle = paste("*Data, broken out across", n_distinct(pp_counts$state), "states,",
                         "represents the number of polling places per 1,000,000 people."),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
@@ -303,7 +297,7 @@ party_colors <- tibble(
 # Dems won the House and Republicans the Senate + Presidency)
 election_map <- plot_usmap(data = state_winners,
                      values = "state_abb",
-                     color = "owner",
+                     # color = state_winners$owner,
                      # Only include states in our dataset
                      include = unique(state_winners$state_abb)) +
   scale_fill_manual(
@@ -348,7 +342,7 @@ votes_scatter <- state_winners %>%
   # geom_smooth(method = "lm", se = FALSE, alpha = .6, linetype = "dash") +
   # Let's change the names of the axes and title
   labs(title = "Number of Polling Places by Total Votes Cast",
-       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,"),
+       subtitle = paste("*Data is broken out across", n_distinct(pp_counts$state), "states"),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
   ) +
@@ -362,4 +356,180 @@ votes_scatter
 
 ggsave(here("Viz/Polling Places by Votes Scatter Plot.jpg"), votes_scatter)
 
+# Let's take another look at our top 10 counts from earlier to see if there's a correlation with
+# which party won a given state
+top_10_by_party <- party_triumphs %>%
+  select(state, year, owner) %>%
+  distinct() %>%
+  right_join(top_10_pp, by = c("state", "year")) %>%
+  # Start our visualization, creating our groups by party affiliation
+  ggplot(aes(x = ps_per_capita,
+             # Reorder the variable so they are arrange descending for each year plot
+             y = forcats::fct_reorder(paste(state, year, sep = "_"), ps_per_capita),
+             fill = owner
+  )) +
+  geom_bar(stat = "identity", na.rm = T) +
+  # Create a separate chart, with a flexible y-axis, for each level of office
+  facet_wrap(~year, scales = "free_y") +
+  scale_fill_manual(
+    name = "Party Winner of Federal Elections",
+    values = c("#2E74C0", "#CB454A", "#999999"),
+    labels = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
+  ) +
+  # Add a label by recreating our data build from earlier
+  geom_label(aes(label = paste(state_abb, ps_per_capita, sep = "-")),
+             size = 3,
+             # Scooch the labels over a smidge
+             hjust = .25) +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Polling Sites per Capita*") +
+  ylab("States") +
+  labs(title = "Number of Polling Places by Population",
+       subtitle = paste("*Data, broken out across", n_distinct(pp_counts$state), "states,",
+                        "represents the states with the largest number of polling places per 1,000,000 people."),
+       caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
+                       "https://github.com/publici/us-polling-places")
+  ) +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(hjust = 0, color = "slateblue2", size = 10),
+        plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+top_10_by_party
 
+ggsave(here("Viz/Top Polling Places by Party Winner.jpg"), top_10_by_party)
+
+# Interestingly enough, in the most notable election covered by our dataset -- the 2016 election --
+# states that ended up going full Republican had the most polling places per capita. The state with
+# the most polling places per capita in 2016 -- Wisconsin -- was notable in that it swung for Trump,
+# much to the Hillary campaign's surprise. To be honest, this finding surprises me a bit, especially
+# given a lot of the rhetoric that Republican states go out of their way to make it more difficult
+# for individuals to vote. Let's take a look at our "worst" 10 states to see if this trend holds.
+
+bottom_10_by_party <- pp_counts %>%
+  # Group by level and state
+  group_by(year) %>%
+  # Pick our top 10
+  top_n(10, -ps_per_capita) %>%
+  # Rearrange our dataset
+  arrange(year, ps_per_capita) %>%
+  ungroup() %>%
+  left_join(party_triumphs %>%
+              select(state, year, owner) %>%
+              distinct(),
+            by = c("state", "year")) %>%
+  # Start our visualization, creating our groups by party affiliation
+  ggplot(aes(x = ps_per_capita,
+             # Reorder the variable so they are arrange descending for each year plot
+             y = forcats::fct_reorder(paste(state, year, sep = "_"), -ps_per_capita),
+             fill = owner
+  )) +
+  geom_bar(stat = "identity", na.rm = T) +
+  # Create a separate chart, with a flexible y-axis, for each level of office
+  facet_wrap(~year, scales = "free_y") +
+  scale_fill_manual(
+    name = "Party Winner of Federal Elections",
+    values = c("#2E74C0", "#CB454A", "#999999"),
+    labels = c("Democrat-controlled", "Republican-controlled", "Split Ticket")
+  ) +
+  # Add a label by recreating our data build from earlier
+  geom_label(aes(label = paste(state_abb, ps_per_capita, sep = "-")),
+             size = 3,
+             # Scooch the labels over a smidge
+             hjust = .25) +
+  # Change the theme to classic
+  theme_classic() +
+  # Let's change the names of the axes and title
+  xlab("Polling Sites per Capita*") +
+  ylab("States") +
+  labs(title = "Number of Polling Places by Population",
+       subtitle = paste("*Data, broken out across", n_distinct(pp_counts$state), "states,",
+                        "represents the states with the least number of polling places per 1,000,000 people."),
+       caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
+                       "https://github.com/publici/us-polling-places")
+  ) +
+  # format our title and subtitle
+  theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(hjust = 0, color = "slateblue2", size = 10),
+        plot.caption = element_text(color = "dark gray", size = 10, face = "italic"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+bottom_10_by_party
+
+ggsave(here("Viz/Bottom Polling Places by Party Winner.jpg"), bottom_10_by_party)
+
+# Looking at the bottom polling places makes the argument a bit more muddled. It's overall a healthier
+# mix of states that went full-Democrat and full-Republican (along with a fair share that had mixed
+# results).
+
+
+# Let's take a closer look at our House races. Specifically, let's tie together all three measures
+# we've previously been discussing:
+#   1. Number of Polling Sites
+#   2. Number of Votes Cast
+#   3. Total Popoulation
+state_winners %>%
+  filter(election == "House") %>%
+  ggplot(aes(x = polling_sites, y = total_vote, color = party_winner, size = population)) +
+  # Make it a scatter plot
+  geom_point(alpha = .7) +
+  # Control formatting of the point sizes
+  scale_size_area(name = "Population") +
+  # geom_text_repel(aes(label = state), size = 4) +
+  scale_color_manual(
+    name = "Party Winner of House Election",
+    values = c("#2E74C0", "#CB454A", "#999999"),
+    labels = c("Democrats", "Republicans", "Split Ticket")
+  ) +
+  theme_classic() +
+  # Create separate scatter plots for each year
+  facet_wrap(~ year) +
+  # Let's change the names of the axes and title
+  labs(title = "Number of Polling Places by Population",
+       subtitle = paste("*Data broken out across", n_distinct(pp_counts$state), "states,",
+                        "represents the number of polling places per 1,000,000 people."),
+       caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
+                       "https://github.com/publici/us-polling-places")
+  ) +
+  xlab("Number of Polling Sites") +
+  ylab("Number of Votes Cast") +
+  # Center the title and format the subtitle/caption
+  theme(plot.title = element_text(hjust = 0, color = "slateblue4"),
+        plot.subtitle = element_text(color = "slateblue1", size = 10),
+        plot.caption = element_text(hjust = 1, face = "italic", color = "dark gray"))
+
+# In terms of trend, I can't see much distinction between states where Republicans won the House
+# versus Democrats. Let's test this using regression. In particular, let's fit a regression
+# model for House elections, using party, number of votes cast, and population as predictors.
+# We expect, based on the plot above, to see highly correlative relationships between number of votes
+# cast, population, and number of polling places. The real question lies in party.
+house_winners <- state_winners %>%
+  filter(election == "House") %>%
+  # Let's make it a bit easier to interpret our data
+  mutate(votes_per_million = total_vote / 1000000,
+         pop_per_million = population / 1000000)
+
+polling_places_model <- lm(polling_sites ~ votes_per_million + pop_per_million + party_winner + year, data = house_winners)
+pander(summary(polling_places_model))
+
+# Looking at the model summary, there are a few interesting things to point out about the relationship
+# between the number of polling sites in a given state.
+#   1. **Population.** The most important thing to note, is that there is only one feature that adequately predicts
+#     the number of polling sites: population. The model states that for every *additional* 577 people
+#     per million in a state, there will be 1 additional polling site.
+#   2. **Total Votes Cast.** Now, if you look back at the bubble plot above, you'd probably (like me) assume that the number
+#     of total votes cast is also a strong predictor for number of polling sites. Why then is the p-value
+#     (denoted in the model output as PR(>|t|) ) .6867 -- much higher than the usual .05 threshold used
+#     to determine statistical significance? Well, it's also true that the number of total votes cast
+#     is extremely highly correlated with the population of a state. States with larger populations naturally
+#     have many more people turn out to vote. Thus, having both of these features in as predictors is
+#     redundant.
+#   3. **Party.** The question we've all been waiting for. Is it true that the party that wins
+#     the House elections in a given state is determinative of the number of polling sites in that
+#     state? Turns out, not so much. The p-value for party winner (denoted *party_winnerRepublican*,
+#     representing the base case in which a state goes Republican) is .3694, well beyond the usual
+#     threshold of .05. Thus, we cannot reject our initial null hypothesis that party winner predicts
+#     number of polling sites.
