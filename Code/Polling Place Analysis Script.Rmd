@@ -519,7 +519,7 @@ state_winners %>%
   facet_wrap(~ year) +
   # Let's change the names of the axes and title
   labs(title = "Number of Polling Places by Population",
-       subtitle = paste("Data is broken out across", n_distinct(pp_counts$state), "states".),
+       subtitle = paste("Data is broken out across", n_distinct(pp_counts$state), "states."),
        caption = paste("Data is accredited to the work of the Center for Public Integrity\n",
                        "https://github.com/publici/us-polling-places")
   ) +
