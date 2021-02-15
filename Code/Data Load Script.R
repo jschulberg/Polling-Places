@@ -124,11 +124,16 @@ start <- lubridate::now()
 
 # Let's split our data into 20 chunks so the below code runs faster
 split_data <- split(polling_cleaned, 1:2000)
-split_data <- split_data[c(1, 2, 3, 4)]
+# split_data <- split_data[c(1:5)]
 
-
+# This function pulls in the Google API so we can get better addresses. It also helps
+# us find the addresses for locations where no address exists (we just have a name
+# of the location, city, and state)
 geocode_data <- function(data) {
   # pacman::p_load(magrittr, purrr)
+
+  # Print out our progress
+  pb$tick()$print()
 
   new_data <<- data %>%
     # Let's use the Google maps (ggmap) package to formalize our addresses, longitude, latitude, etc.
@@ -138,19 +143,17 @@ geocode_data <- function(data) {
     mutate_geocode(address, output = c("latlona"), source = "google", override_limit = TRUE) %>%
     relocate(contains("address"), .after = last_col())
 
-  # Print out our progress
-  pb$tick()$print()
-
 }
 
 # create the progress bar with a dplyr function.
 pb <- progress_estimated(length(split_data))
 
-# res <- split_data %>%
-#   map_df(~geocode_data(.))
+all_geocoded_data <- split_data %>%
+  map_df(~geocode_data(.))
 
-all_geocoded_data <- map(split_data, geocode_data)
-binded_data <- bind_rows(all_geocoded_data)
+# all_geocoded_data <- map(split_data, geocode_data)
+# binded_data <- bind_rows(all_geocoded_data)
+
 
 end <- lubridate::now()
 end - start
