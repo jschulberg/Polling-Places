@@ -235,7 +235,7 @@ pp_bar_one_row <- top_10_pp %>%
   )) +
   geom_bar(stat = "identity", fill = "slateblue", na.rm = T) +
   # Create a separate chart, with a flexible y-axis, for each level of office
-  facet_wrap(~year, nrow = 1) +
+  facet_wrap(~year, scales = "free_y", nrow = 1) +
   # Add a label by recreating our data build from earlier
   geom_label(aes(label = paste(state_abb, ps_per_capita, sep = "-")),
              size = 2) +

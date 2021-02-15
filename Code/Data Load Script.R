@@ -8,6 +8,7 @@ pacman::p_load(tidyverse,
                readr,
                praise,
                SmartEDA,
+               ggmap, # Google package for using their API
                stringi)
 
 # The Data folder has 32 states represented in it, so we'll need to read
@@ -15,8 +16,8 @@ pacman::p_load(tidyverse,
 
 # Determine the different state folders in our dataset and remove any
 # already existing csv files
-all_files <- list.files(here("Data/Polling-Places-Data/"))
-csv_files <- list.files(here("Data/Polling-Places-Data/"), pattern = ".csv$")
+all_files <- list.files(here("Data/"))
+csv_files <- list.files(here("Data/"), pattern = ".csv$")
 states <- setdiff(all_files, csv_files)
 
 # Initialize an empty dataframe
@@ -42,7 +43,7 @@ for (state_ in states) {
   print(state_)
   # Within each data folder, there are multiple .csv files, one for each election
   # Let's pull out each of these files
-  state_contents <- list.files(paste(here("Data/Polling-Places-Data/"), state_, sep = "/"))
+  state_contents <- list.files(paste(here("Data/"), state_, sep = "/"))
   cat("About to parse through the following files in the", state_, "folder:\n",
       state_contents)
 
@@ -56,7 +57,7 @@ for (state_ in states) {
       csvs <- c(csvs, i)
 
       # Find the file path name for the csv
-      csv_name <- paste("Data", "Polling-Places-Data", state_, i, sep = "/")
+      csv_name <- paste("Data", state_, i, sep = "/")
       # print(paste("File is located here:", csv_name))
 
       # Let's read in the file as a temporary dataframe
@@ -92,6 +93,7 @@ for (state_ in states) {
 cat(praise(), "WE'RE DONE!!!")
 
 
+
 #### Data Cleaning ####
 # Now we'll clean up our data so it's all interpretable
 polling_cleaned <- polling_places %>%
@@ -114,9 +116,46 @@ polling_cleaned <- polling_places %>%
   # Remove notes since that only has one distinct value
   select(-c(notes, ghost_precinct, state_name, polling_location_type, polling_place_id, ward)) %>%
   # State came in super weird, so let's replace this with state_abbreviation
-  left_join(tibble(state = state.name, state_abb = state.abb), by = "state") %>%
-  print()
+  left_join(tibble(state = state.name, state_abb = state.abb), by = "state")
+
+
+
+start <- lubridate::now()
+
+# Let's split our data into 20 chunks so the below code runs faster
+split_data <- split(polling_cleaned, 1:2000)
+split_data <- split_data[c(1, 2, 3, 4)]
+
+
+geocode_data <- function(data) {
+  # pacman::p_load(magrittr, purrr)
+
+  new_data <<- data %>%
+    # Let's use the Google maps (ggmap) package to formalize our addresses, longitude, latitude, etc.
+    # Because not all rows have addresses (but do have names), let's coalesce the two columns
+    mutate(address = if_else(is.na(address), paste(name, jurisdiction, state, sep = ", "), address)) %>%
+    # Note: This takes a hella long time to run
+    mutate_geocode(address, output = c("latlona"), source = "google", override_limit = TRUE) %>%
+    relocate(contains("address"), .after = last_col())
+
+  # Print out our progress
+  pb$tick()$print()
+
+}
+
+# create the progress bar with a dplyr function.
+pb <- progress_estimated(length(split_data))
+
+# res <- split_data %>%
+#   map_df(~geocode_data(.))
+
+all_geocoded_data <- map(split_data, geocode_data)
+binded_data <- bind_rows(all_geocoded_data)
+
+end <- lubridate::now()
+end - start
+
 
 
 # Let's save our final dataset, now that it's fully combined and cleaned
-readr::write_csv(polling_cleaned, "Data/all_states_cleaned.csv")
+# readr::write_csv(polling_cleaned, "Data/all_states_cleaned.csv")

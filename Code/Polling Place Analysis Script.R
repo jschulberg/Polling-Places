@@ -544,4 +544,14 @@ pander(summary(polling_places_model))
 # Unfortunately, that data is expensive.
 
 # Where else should I go with this? Leave your thoughts in the comments.
-knitr::spin()
+
+p_load(ggmap)
+
+for(i in 1:nrow(polling_joined) ) {
+  # Print("Working...")
+  result <- geocode(polling_joined$address[i], output = "latlona", source = "google")
+  polling_joined$lon[i] <- as.numeric(result[1])
+  polling_joined$lat[i] <- as.numeric(result[2])
+  polling_joined$geoAddress[i] <- as.character(result[3])
+}
+
